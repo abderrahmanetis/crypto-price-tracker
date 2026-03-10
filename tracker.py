@@ -3,16 +3,25 @@ import requests
 
 url = "https://api.coingecko.com/api/v3/simple/price"
 
-# List the coins you want to track by their CoinGecko IDs
-coins = ["bitcoin", "ethereum", "dogecoin"]
+# Let the user choose which coins to track (CoinGecko IDs, e.g. bitcoin, ethereum, solana)
+coin_input = input("Enter coins to track (comma-separated, e.g. bitcoin,ethereum,dogecoin): ")
+coins = [c.strip().lower() for c in coin_input.split(",") if c.strip()]
+if not coins:
+    coins = ["bitcoin", "ethereum", "dogecoin"]
+    print("Using defaults: bitcoin, ethereum, dogecoin")
 
-# Simple alert thresholds per coin (edit these)
-# If the current price is >= target, an alert will be printed.
-alerts = {
-    "bitcoin": 70000,   # example target price in USD
-    "ethereum": 4000,
-    "dogecoin": 0.5,
-}
+# Optional: set alert targets (format: coin:price, e.g. bitcoin:70000,ethereum:4000)
+alert_input = input("Enter alert targets (coin:price, comma-separated) or press Enter to skip: ")
+alerts = {}
+for part in alert_input.split(","):
+    part = part.strip()
+    if ":" in part:
+        coin_id, target_str = part.split(":", 1)
+        coin_id = coin_id.strip().lower()
+        try:
+            alerts[coin_id] = float(target_str.strip())
+        except ValueError:
+            pass
 
 while True:
     params = {
