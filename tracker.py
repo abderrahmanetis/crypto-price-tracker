@@ -6,6 +6,7 @@ from utils import (
     clear_screen,
     fetch_prices_with_retry,
     save_prices_to_csv,
+    setup_logging,
 )
 
 
@@ -85,6 +86,7 @@ def build_dashboard(
 def main() -> None:
     args = parse_args()
     coins = parse_coins(args.coins)
+    setup_logging()
 
     url = "https://api.coingecko.com/api/v3/simple/price"
     previous_prices: Dict[str, float] = {}

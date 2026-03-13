@@ -1,9 +1,24 @@
 import csv
+import logging
 import os
 import time
 from typing import Dict, Tuple
 
 import requests
+
+LOG_FILE = "tracker.log"
+logger = logging.getLogger("crypto_tracker")
+
+
+def setup_logging(log_file: str = LOG_FILE) -> None:
+    """Configure logging to tracker.log. Call once at startup."""
+    logger.setLevel(logging.INFO)
+    logger.handlers.clear()
+    fh = logging.FileHandler(log_file, encoding="utf-8")
+    fh.setFormatter(
+        logging.Formatter("%(asctime)s | %(levelname)-8s | %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+    )
+    logger.addHandler(fh)
 
 
 def clear_screen() -> None:
@@ -31,10 +46,11 @@ def fetch_prices_with_retry(
         try:
             response = requests.get(url, params=params, timeout=10)
             response.raise_for_status()
+            logger.info("API request success")
             return True, response.json()
         except requests.RequestException as exc:
             last_error = str(exc)
-            # Wait a bit before trying again
+            logger.error("API error: %s", last_error)
             time.sleep(delay_seconds)
 
     return False, last_error
@@ -66,4 +82,5 @@ def save_prices_to_csv(
 
         for coin, price in prices.items():
             writer.writerow([timestamp, coin, price])
+    logger.info("Price updated")
 

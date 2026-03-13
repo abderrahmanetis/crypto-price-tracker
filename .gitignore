@@ -1,0 +1,12 @@
+# Logs and generated data
+tracker.log
+*.log
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Optional: uncomment to avoid committing price history
+# prices.csv

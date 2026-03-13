@@ -61,11 +61,11 @@ You can customize which coins to track, the refresh interval, and the CSV file p
 python tracker.py --coins bitcoin,ethereum,solana --interval 15 --csv my_prices.csv
 ```
 
-- **`--coins`**: comma-separated CoinGecko IDs of coins to track  
+- **`--coins`**: comma-separated CoinGecko IDs of coins to track
   - Default: `bitcoin,ethereum,dogecoin`
-- **`--interval`**: refresh interval in seconds  
+- **`--interval`**: refresh interval in seconds
   - Default: `30`
-- **`--csv`**: path to the CSV file where price history is saved  
+- **`--csv`**: path to the CSV file where price history is saved
   - Default: `prices.csv`
 
 Press **Ctrl+C** to stop the tracker.
@@ -83,7 +83,7 @@ Coin           Price (USD)        Change
 ----------------------------------------
 bitcoin            67500.1234      ↑
 dogecoin               0.1500      ↓
-ethereum            3500.0000       
+ethereum            3500.0000
 ----------------------------------------
 Press Ctrl+C to exit.
 ```
@@ -104,4 +104,3 @@ timestamp,coin,price
 - Prices are fetched from the public CoinGecko API (`/simple/price` endpoint).
 - Make sure your internet connection is working when you run the tracker.
 - If the API fails temporarily, the app will retry a few times and display an error message before trying again on the next interval.
-
