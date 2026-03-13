@@ -1,49 +1,136 @@
+import argparse
 import time
-import requests
+from typing import Dict, List, Tuple
 
-url = "https://api.coingecko.com/api/v3/simple/price"
+from utils import (
+    clear_screen,
+    fetch_prices_with_retry,
+    save_prices_to_csv,
+)
 
-# Let the user choose which coins to track (CoinGecko IDs, e.g. bitcoin, ethereum, solana)
-coin_input = input("Enter coins to track (comma-separated, e.g. bitcoin,ethereum,dogecoin): ")
-coins = [c.strip().lower() for c in coin_input.split(",") if c.strip()]
-if not coins:
-    coins = ["bitcoin", "ethereum", "dogecoin"]
-    print("Using defaults: bitcoin, ethereum, dogecoin")
 
-# Optional: set alert targets (format: coin:price, e.g. bitcoin:70000,ethereum:4000)
-alert_input = input("Enter alert targets (coin:price, comma-separated) or press Enter to skip: ")
-alerts = {}
-for part in alert_input.split(","):
-    part = part.strip()
-    if ":" in part:
-        coin_id, target_str = part.split(":", 1)
-        coin_id = coin_id.strip().lower()
-        try:
-            alerts[coin_id] = float(target_str.strip())
-        except ValueError:
-            pass
+def parse_args() -> argparse.Namespace:
+    """Parse command line arguments for the tracker CLI."""
+    parser = argparse.ArgumentParser(
+        description="Track cryptocurrency prices in the terminal."
+    )
 
-while True:
-    params = {
-        "ids": ",".join(coins),
-        "vs_currencies": "usd",
-    }
+    parser.add_argument(
+        "--coins",
+        type=str,
+        default="bitcoin,ethereum,dogecoin",
+        help=(
+            "Comma-separated list of CoinGecko IDs to track "
+            "(e.g. bitcoin,ethereum,solana). "
+            "Default: bitcoin,ethereum,dogecoin"
+        ),
+    )
 
-    response = requests.get(url, params=params)
-    data = response.json()
+    parser.add_argument(
+        "--interval",
+        type=int,
+        default=30,
+        help="Refresh interval in seconds (default: 30).",
+    )
 
-    print("\n--- Latest Prices ---")
-    for coin in coins:
-        # Each entry looks like: {"bitcoin": {"usd": 12345.67}, ...}
-        price = data.get(coin, {}).get("usd")
-        if price is not None:
-            print(f"The price of {coin.capitalize()} is {price} USD")
+    parser.add_argument(
+        "--csv",
+        type=str,
+        default="prices.csv",
+        help="Path to the CSV file for saving price history (default: prices.csv).",
+    )
 
-            target = alerts.get(coin)
-            if target is not None and price >= target:
-                print(f"*** ALERT: {coin.capitalize()} has reached {price} USD (target {target} USD) ***")
+    return parser.parse_args()
+
+
+def parse_coins(raw: str) -> List[str]:
+    """Turn a comma-separated string into a clean list of coin IDs."""
+    coins = [c.strip().lower() for c in raw.split(",") if c.strip()]
+    if not coins:
+        coins = ["bitcoin", "ethereum", "dogecoin"]
+    return coins
+
+
+def build_dashboard(
+    prices: Dict[str, float],
+    previous_prices: Dict[str, float],
+) -> str:
+    """Return a formatted dashboard string for the terminal."""
+    lines: List[str] = []
+    lines.append("Crypto Price Tracker")
+    lines.append("-" * 40)
+    lines.append(f"{'Coin':<12} {'Price (USD)':>15}  Change")
+    lines.append("-" * 40)
+
+    for coin in sorted(prices.keys()):
+        price = prices[coin]
+        prev_price = previous_prices.get(coin)
+
+        if prev_price is None:
+            indicator = " "
+        elif price > prev_price:
+            indicator = "↑"
+        elif price < prev_price:
+            indicator = "↓"
         else:
-            print(f"No price data available for {coin}")
+            indicator = " "
 
-    # Wait 30 seconds before refreshing
-    time.sleep(30)
+        lines.append(f"{coin:<12} {price:>15.4f}  {indicator}")
+
+    lines.append("-" * 40)
+    lines.append("Press Ctrl+C to exit.")
+    return "\n".join(lines)
+
+
+def main() -> None:
+    args = parse_args()
+    coins = parse_coins(args.coins)
+
+    url = "https://api.coingecko.com/api/v3/simple/price"
+    previous_prices: Dict[str, float] = {}
+
+    while True:
+        params = {
+            "ids": ",".join(coins),
+            "vs_currencies": "usd",
+        }
+
+        success, prices_or_error = fetch_prices_with_retry(
+            url=url,
+            params=params,
+            retries=3,
+            delay_seconds=5,
+        )
+
+        if not success:
+            clear_screen()
+            print("Crypto Price Tracker")
+            print("-" * 40)
+            print("Error fetching prices after multiple attempts.")
+            print(f"Last error: {prices_or_error}")
+            print("-" * 40)
+            print("Retrying in a few seconds... (Press Ctrl+C to exit)")
+            time.sleep(args.interval)
+            continue
+
+        # prices_or_error is a dict like {"bitcoin": {"usd": 12345.67}, ...}
+        data: Dict[str, Dict[str, float]] = prices_or_error
+        current_prices: Dict[str, float] = {}
+
+        for coin in coins:
+            current_price = data.get(coin, {}).get("usd")
+            if current_price is not None:
+                current_prices[coin] = float(current_price)
+
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+        save_prices_to_csv(args.csv, timestamp, current_prices)
+
+        clear_screen()
+        print(build_dashboard(current_prices, previous_prices))
+
+        previous_prices = current_prices
+        time.sleep(args.interval)
+
+
+if __name__ == "__main__":
+    main()
